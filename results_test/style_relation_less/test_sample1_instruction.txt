@@ -1,0 +1,1 @@
+Transform the photo<image_3> into a stylized illustration with a floral patterned background, as the transformation from <image_1> to <style>style reference<image_2>

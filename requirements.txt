@@ -1,0 +1,27 @@
+torch>=2.5.0
+torchvision>=0.20.0
+torchaudio>=2.5.0
+transformers==4.49.0
+accelerate>=0.34.0
+peft>=0.17.0
+sentencepiece==0.1.99
+safetensors>=0.4.3
+bitsandbytes
+numpy>=1.24.0
+scipy==1.10.1
+opencv-python==4.7.0.72
+pillow>=10.0.0
+decord==0.6.0
+einops==0.8.1
+datasets>=2.18.0
+pyarrow>=11.0.0
+PyYAML==6.0.2
+requests==2.32.3
+wandb
+tqdm
+setuptools
+wheel
+ninja
+gradio
+triton ; sys_platform != 'win32'
+triton-windows ; sys_platform == 'win32'
