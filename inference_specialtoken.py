@@ -22,10 +22,10 @@ from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.autoencoder import load_ae
 from safetensors.torch import load_file
 from peft import PeftConfig, PeftModel, LoraConfig, get_peft_model
-from inferencer import InterleaveInferencer  # 确保这个导入是正确的
+from inferencer import InterleaveInferencer  
 
 
-# 添加命令行参数解析
+
 def parse_args():
     parser = argparse.ArgumentParser(description='BAGEL Model Inference')
     parser.add_argument('--parquet_dir', type=str, default="./data/all_specialtoken_data_select/seedxedit_multi/test", help='Path to the input Parquet file')
@@ -41,14 +41,9 @@ def parse_args():
 
 
 def _extract_instruction(instr_field) -> str:
-    """
-    支持 [[str]] / [str] / str / numpy/pyarrow list-like.
-    绝不做 `if instr_field:` 的布尔判断。
-    """
     if instr_field is None:
         return ""
     try:
-        # 常见：[[...]]
         if isinstance(instr_field, (list, tuple)) and len(instr_field) > 0:
             first = instr_field[0]
             if isinstance(first, (list, tuple)) and len(first) > 0:
@@ -63,9 +58,6 @@ def _extract_instruction(instr_field) -> str:
             return str(instr_field)
 
 def _extract_image_list(img_field) -> list:
-    """
-    将 image_list 统一成 Python list[bytes]；避免 `if img_field:`
-    """
     if img_field is None:
         return []
     if isinstance(img_field, list):
@@ -86,9 +78,8 @@ def save_text_meta(txt_path: Path, instruction: str, data_prep_method: str, parq
         f.write("instruction:\n")
         f.write(instruction.strip() + "\n")
 
-# 初始化模型和inferencer (保持不变)
+
 def initialize_model_and_inferencer(model_path, ema_model_path, max_mem_per_gpu, use_lora, visual_und, visual_gen):
-    # 确保输出目录存在
     os.makedirs(args.output_dir, exist_ok=True)
     # LLM config preparing
     llm_config = Qwen2Config.from_json_file(os.path.join(model_path, "llm_config.json"))
@@ -169,7 +160,7 @@ def initialize_model_and_inferencer(model_path, ema_model_path, max_mem_per_gpu,
         for k in same_device_modules:
             if k in device_map:
                 device_map[k] = first_device
-    # 加载EMA模型
+
     if use_lora:
         model = load_checkpoint_and_dispatch(
             model,
@@ -197,7 +188,7 @@ def initialize_model_and_inferencer(model_path, ema_model_path, max_mem_per_gpu,
     # assert len(tokenizer) == in_emb == out_emb, "词表与嵌入层/输出头大小不一致！"
     model = model.eval()
     print('Model loaded')
-    # 创建inferencer
+  
     inferencer = InterleaveInferencer(
         model=model,
         vae_model=vae_model,
@@ -208,13 +199,8 @@ def initialize_model_and_inferencer(model_path, ema_model_path, max_mem_per_gpu,
     )
     return inferencer
 
-# 处理单个样本的生成（改为处理Parquet格式的样本）
+
 def generate_image_from_parquet_sample(sample_id, row, inferencer, output_dir):
-    """
-    处理Parquet格式的单个样本
-    row: 包含image_list和instruction_list的DataFrame行
-    """
-    # 准备推理超参数
     inference_hyper = dict(
         cfg_text_scale=4.0,
         cfg_img_scale=2.0,
@@ -224,42 +210,32 @@ def generate_image_from_parquet_sample(sample_id, row, inferencer, output_dir):
         cfg_renorm_min=0.0,
         cfg_renorm_type="text_channel",
     )
-    
-    # 获取指令文本（作为第一个元素）
+
     instruction = row['instruction_list'][0][0]
     data_prep_method = row.get('data_prep_method', 'unknown')
     txt_path = file_out_dir / f"sample_{global_sample_id:06d}.txt"
     save_text_meta(txt_path, instruction, data_prep_method, parquet_path, global_sample_id)
-    # 处理图片列表
     image_list = row['image_list']
-    # 准备输入列表：先是指令文本，然后是所有输入图片
     input_list = []
     input_list.append(instruction)
     
-    # 保存并处理每张输入图片（除了最后一张ground truth）
     for img_idx, img_bytes in enumerate(image_list[:-1]):
-        # 将字节转换为PIL图像
         img = Image.open(BytesIO(img_bytes))
         
-        # 保存输入图片
         img_path = file_out_dir / f"sample_{global_sample_id:06d}_in_{img_idx}.jpg"
         img.save(img_path, quality=95)
         print(f"Saved input image: {img_path}")
         
-        # 添加到输入列表
         input_list.append(img)
 
     
-    # 执行推理（只生成一张图片）
     output_dict = inferencer.interleave_inference(input_lists=input_list, **inference_hyper)
     generated_img = output_dict[0]
     
-    # 保存生成的图片
     gen_path = file_out_dir / f"sample_{global_sample_id:06d}_gen.jpg"
     generated_img.save(gen_path, quality=95)
     print(f"Saved generated image: {gen_path}")
     
-    # 保存ground truth（最后一张图片）用于参考
     if len(image_list) > 1:
         # gt_img = Image.open(BytesIO(image_list[-1]))
         # gt_path = file_out_dir / f"sample_{global_sample_id:06d}_img_gt.jpg"
@@ -281,76 +257,65 @@ def generate_image_from_parquet_sample(sample_id, row, inferencer, output_dir):
 
 
 
-# 全局变量占位（供 generate_image_from_parquet_sample 使用）
 global_sample_id = 0
 file_out_dir = None
 parquet_path = None
 
 def main(parquet_dir, start_id, output_dir, inferencer):
-    """
-    遍历目录下所有 *.parquet：
-      - 每个 parquet 建一个子文件夹（以文件名 stem 命名）
-      - 在该子文件夹内保存输入图、生成图、GT图与 txt
-      - 跨文件维度的样本计数用 global_sample_id 递增（可用于断点续跑）
-    """
     root = Path(parquet_dir)
     files = sorted([p for p in root.glob("*.parquet") if p.is_file()])
     if not files:
         print(f"[WARN] No parquet found in: {parquet_dir}")
         return
 
-    # 确保输出目录存在
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     global global_sample_id, file_out_dir, parquet_path
 
     for f in files:
-        parquet_path = f  # 供 generate_image_from_parquet_sample 使用
+        parquet_path = f 
         subdir = f.stem
         file_out_dir = Path(output_dir) / subdir
         file_out_dir.mkdir(parents=True, exist_ok=True)
 
-        df = pd.read_parquet(parquet_path)  # 你现在的做法
+        df = pd.read_parquet(parquet_path)  
 
         for idx, row in enumerate(df.itertuples(index=False)):
-            # 全局 sample 计数（跨所有 parquet）
             global global_sample_id
 
-            # 起始跳过（不要用 if row ... 这种布尔判断）
             if global_sample_id < start_id:
                 if (global_sample_id % 100) == 0:
-                    print(f"跳过样本 {global_sample_id} (小于开始ID {start_id})")
+                    print(f"Skip Sample {global_sample_id}")
                 global_sample_id += 1
                 continue
 
-            # 取字段（itertuples 用 getattr）
+          
             instr_field = getattr(row, 'instruction_list')
             img_field   = getattr(row, 'image_list')
             try:
                 _instr = _extract_instruction(instr_field)
                 _imgs  = _extract_image_list(img_field)
-                print(f"指令: {_instr}")
-                print(f"包含 {len(_imgs)} 张图片")
+                print(f"Instruction: {_instr}")
+                print(f"Include {len(_imgs)} images")
 
-                # 仍然复用你的原有单样本逻辑
+
                 generate_image_from_parquet_sample(
-                    global_sample_id,                                # ✅ 传入当前全局ID
+                    global_sample_id,                                
                     {'instruction_list': instr_field, 'image_list': img_field},
                     inferencer,
                     output_dir
                 )
-                print(f"样本 {global_sample_id} 处理完成")
+                print(f"Sample {global_sample_id} completed")
             except Exception as e:
-                print(f"[ERR] 处理文件 {f.name} | 样本 #{global_sample_id} 出错: {e}")
+                print(f"[ERR] Process {f.name} | sample #{global_sample_id} error: {e}")
             finally:
-                global_sample_id += 1                                  # ✅ 处理完递增
+                global_sample_id += 1                                  
 
 
 
 if __name__ == "__main__":
     args = parse_args()
 
-    # 设置随机种子
     seed = 42
     random.seed(seed)
     np.random.seed(seed)
@@ -361,7 +326,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
-    # 初始化模型和inferencer
+
     inferencer = initialize_model_and_inferencer(
         model_path=args.model_path,
         ema_model_path=args.ema_model_path,
@@ -371,7 +336,7 @@ if __name__ == "__main__":
         visual_gen=args.visual_gen
     )
 
-    # 循环处理目录中的所有 parquet
+
     main(
         parquet_dir=args.parquet_dir,
         start_id=args.start_id,
