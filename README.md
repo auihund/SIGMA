@@ -1,7 +1,7 @@
 # SIGMA: Selective-Interleaved Generation with Multi-Attribute Tokens
 
 <p align="center">
-    <a href="https://arxiv.org/abs/xxx">
+    <a href="https://arxiv.org/pdf/2602.07564">
             <img alt="arXiv SIGMA" src="https://img.shields.io/badge/arXiv-SIGMA-red?logo=arxiv&logoColor=red">
     </a>
     <a href="https://github.com/auihund/SIGMA/">
