@@ -205,11 +205,13 @@ jupyter notebook demo.ipynb
 ## Citation
 If you find SIGMA useful in your research, please cite:
 ```bibtxt
-@article{xxx,
-  title={SIGMA: Selective-Interleaved Generation with Multi-Attribute Tokens},
-  author={Zhang, Xiaoyan and Bai, Zechen and Wang, Haofan and Song, Yiren},
-  journal={arXiv preprint arXiv:xxxx.xxxxx},
-  year={2026}
+@misc{zhang2026sigmaselectiveinterleavedgenerationmultiattribute,
+      title={SIGMA: Selective-Interleaved Generation with Multi-Attribute Tokens}, 
+      author={Xiaoyan Zhang and Zechen Bai and Haofan Wang and Yiren Song},
+      year={2026},
+      eprint={2602.07564},
+      archivePrefix={arXiv},
+      url={https://arxiv.org/abs/2602.07564}, 
 }
 ```
 
